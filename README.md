@@ -1,4 +1,6 @@
 # monex-stock-summary
+Login to Monex and download yearly stock trading activities(csv) and summarize by monthly
+
 ## Requirements
 + Xvfb
 + FireFox

@@ -148,6 +148,7 @@ public class App {
                     curSum.amount += sum.amount;
                 }
             });
+            Map<String, Integer> total = new HashMap<>();
             map.keySet().stream().sorted(new Comparator<MonthlySummary>() {
                 @Override
                 public int compare(MonthlySummary o1, MonthlySummary o2) {
@@ -161,7 +162,18 @@ public class App {
                     }
                     return o1.category.compareTo(o2.category);
                 }
-            }).forEach(sum -> System.out.println(sum));
+            }).forEach(sum -> {
+                Integer integer = total.get(sum.category);
+                if (integer == null) {
+                    integer = 0;
+                }
+                integer = integer.intValue() + sum.amount;
+                total.put(sum.category, integer);
+                System.out.println(sum);
+            });
+            total.keySet().stream().sorted().forEach(key->{
+                System.out.println(String.format("total: category=%s, amount=%d", key, total.get(key)));
+            });
         } catch (IOException e) {
             throw new RuntimeException(e);
         }
