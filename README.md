@@ -5,6 +5,9 @@
 + Java 1.8
 + Gradle 2.5
 
+## Configure
+Modify '/monex-stock-summary/src/main/resources/monex.properties'
+
 ## Build
 ``gradle clean fatCapsule``
 
