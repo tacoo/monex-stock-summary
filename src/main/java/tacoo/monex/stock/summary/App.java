@@ -14,6 +14,7 @@ import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Properties;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -41,10 +42,13 @@ public class App {
         Properties properties = loadProperties();
         String id = properties.get("monex.id").toString();
         String pass = properties.get("monex.password").toString();
-        fetchCurrentYearSummary(id, pass);
+        File csvFile = fetchCurrentYearSummary(id, pass);
+        printSummary(csvFile);
+        csvFile.delete();
+        new File(tempDirPath).delete();
     }
 
-    private void fetchCurrentYearSummary(String id, String pass) {
+    private File fetchCurrentYearSummary(String id, String pass) {
         FirefoxProfile profile = setupProfile();
         FirefoxDriver driver = new FirefoxDriver(profile);
         driver.get("http://www.monex.co.jp/");
@@ -82,22 +86,33 @@ public class App {
         WebElement downloadElement = driver.findElement(By.name("SUBMIT"));
         downloadElement.click();
 
-        File csvFile = Stream.of(new File(tempDirPath).listFiles())
-                .filter(f -> f.getName().endsWith(".csv"))
-                .findFirst()
-                .get();
+        File csvFile = null;
+        for (int i = 0; i < 30; i++) {
+            Optional<File> first = Stream.of(new File(tempDirPath).listFiles())
+                    .filter(f -> f.getName().endsWith(".csv"))
+                    .findFirst();
+            if (first.isPresent()) {
+                csvFile = first.get();
+                break;
+            } else {
+                try {
+                    Thread.sleep(1000);
+                } catch (InterruptedException e) {
+                    e.printStackTrace();
+                }
+            }
+        }
+
         System.out.println("csv file: " + csvFile.getAbsolutePath());
 
-        loadCsv(csvFile);
-
-        csvFile.delete();
-        new File(tempDirPath).delete();
         driver.close();
         driver.switchTo().window(mainWinID);
         driver.close();
+
+        return csvFile;
     }
 
-    private void loadCsv(File csvFile) {
+    private void printSummary(File csvFile) {
         try (CSVParser parse = CSVFormat.EXCEL.parse(new InputStreamReader(
                 new FileInputStream(csvFile), "sjis"))) {
             parse.iterator().next();
@@ -171,7 +186,7 @@ public class App {
                 total.put(sum.category, integer);
                 System.out.println(sum);
             });
-            total.keySet().stream().sorted().forEach(key->{
+            total.keySet().stream().sorted().forEach(key -> {
                 System.out.println(String.format("total: category=%s, amount=%d", key, total.get(key)));
             });
         } catch (IOException e) {
