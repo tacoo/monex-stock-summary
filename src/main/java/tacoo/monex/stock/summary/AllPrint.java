@@ -22,6 +22,7 @@ import org.apache.commons.lang3.StringUtils;
 
 public class AllPrint {
 
+    private static final String YYYY_MM_DD = "yyyy/MM/dd";
     static String baseDate = "受渡日";
 
     // static String baseDate = "約定日";
@@ -31,51 +32,17 @@ public class AllPrint {
                 new FileInputStream(csvFile), "sjis"))) {
 
             final Map<String, Integer> headerMap = new HashMap<>();
-            SimpleDateFormat sdf = new SimpleDateFormat("yyyy/MM/dd");
-            DecimalFormat df = new DecimalFormat("###,###.###");
-            Map<String, Money> sums = new HashMap<String, Money>();
-            String year = "";
-            Map<String, Stock> stocks = new HashMap<String, Stock>();
+            Map<String, Money> sums = new HashMap<>();
             List<CSVRecord> csvDataList = new ArrayList<>();
-            for (CSVRecord r : parser) {
-                if (r.getRecordNumber() == 1) {
-                    continue;
-                }
-                if (r.getRecordNumber() == 2) {
-                    headerMap.putAll(getHeader(r));
-                } else {
-                    String name = r.get(headerMap.get("銘柄名"));
-                    if ("日興ＭＲＦ".equals(name)) {
-                        continue;
-                    }
-                    csvDataList.add(r);
-                }
-            }
-            csvDataList.sort(new Comparator<CSVRecord>() {
-                @Override
-                public int compare(CSVRecord r1, CSVRecord r2) {
-                    try {
-                        Date d1 = sdf.parse(r1.get(headerMap.get(baseDate)));
-                        Date d2 = sdf.parse(r2.get(headerMap.get(baseDate)));
-                        int comp1 = d1.compareTo(d2);
-                        if (comp1 != 0) {
-                            return comp1;
-                        }
-                        String t1 = r1.get(headerMap.get("取引"));
-                        String t2 = r2.get(headerMap.get("取引"));
-                        if (t1.equals("ご売却") && t2.equals("ご売却")) {
-                            return 0;
-                        } else if (t1.equals("ご売却")) {
-                            return 1;
-                        } else if (t2.equals("ご売却")) {
-                            return -1;
-                        }
-                    } catch (ParseException e) {
-                        e.printStackTrace();
-                    }
-                    return 0;
-                }
-            });
+            filterHeaderAndMRF(parser, headerMap, csvDataList);
+            csvDataList.sort(new CSVRecordComparator(headerMap));
+
+            String year = "";
+            SimpleDateFormat sdf = new SimpleDateFormat(YYYY_MM_DD);
+            DecimalFormat df = new DecimalFormat("###,###.###");
+            Map<String, Stock> stocks = new HashMap<>();
+
+            Map<String, String> stockCodeAndName = new HashMap<>();
 
             for (CSVRecord r : csvDataList) {
                 Date date = sdf.parse(r.get(headerMap.get(baseDate)));
@@ -84,7 +51,7 @@ public class AllPrint {
                 String tmp = calendar.get(Calendar.YEAR) + "";
                 if (!"".equals(year) && !tmp.equals(year)) {
                     Money lastOne = sums.get(year);
-                    Map<String, Stock> carryOverStocks = new HashMap<String, Stock>();
+                    Map<String, Stock> carryOverStocks = new HashMap<>();
                     for (String k : stocks.keySet()) {
                         Stock stock = stocks.get(k);
                         carryOverStocks.put(k, stock.clone());
@@ -130,13 +97,13 @@ public class AllPrint {
 
                     String stockCode = r.get(headerMap.get("銘柄コード")).trim();
                     String stockName = r.get(headerMap.get("銘柄名")).trim();
-                    String stockId = stockCode + " - " + stockName;
-                    Stock stock = stocks.get(stockId);
+                    stockCodeAndName.put(stockCode, stockName);
+                    Stock stock = stocks.get(stockCode);
                     if (stock == null) {
                         stock = new Stock();
-                        stocks.put(stockId, stock);
+                        stocks.put(stockCode, stock);
                     }
-                    stock.name = stockId;
+                    stock.name = stockCode + "-" + stockName;
                     stock.quantity += qty;
                     stock.total -= value;
                 } else if ("ご売却".equals(tradeType)) {
@@ -154,16 +121,16 @@ public class AllPrint {
 
                     String stockCode = r.get(headerMap.get("銘柄コード")).trim();
                     String stockName = r.get(headerMap.get("銘柄名")).trim();
-                    String stockId = stockCode + " - " + stockName;
-                    Stock stock = stocks.get(stockId);
+                    stockCodeAndName.put(stockCode, stockName);
+                    Stock stock = stocks.get(stockCode);
                     if (stock == null) {
                         stock = new Stock();
-                        stocks.put(stockId, stock);
+                        stocks.put(stockCode, stock);
                     }
-                    stock.name = stockId;
+                    stock.name = stockCode + "-" + stockName;
                     if (stock.quantity == qty) {
                         money.gain += (stock.total + value);
-                        stocks.remove(stockId);
+                        stocks.remove(stockCode);
                     } else {
                         // int ave = -stock.total / stock.quantity;
                         // int soldAve = value / qty;
@@ -180,7 +147,7 @@ public class AllPrint {
             }
 
             Money lastOne = sums.get(year);
-            Map<String, Stock> carryOverStocks = new HashMap<String, Stock>();
+            Map<String, Stock> carryOverStocks = new HashMap<>();
             for (String k : stocks.keySet()) {
                 Stock stock = stocks.get(k);
                 carryOverStocks.put(k, stock.clone());
@@ -259,6 +226,23 @@ public class AllPrint {
 
     }
 
+    private static void filterHeaderAndMRF(CSVParser parser, final Map<String, Integer> headerMap, List<CSVRecord> csvDataList) {
+        for (CSVRecord r : parser) {
+            if (r.getRecordNumber() == 1) {
+                continue;
+            }
+            if (r.getRecordNumber() == 2) {
+                headerMap.putAll(getHeader(r));
+            } else {
+                String name = r.get(headerMap.get("銘柄名"));
+                if ("日興ＭＲＦ".equals(name)) {
+                    continue;
+                }
+                csvDataList.add(r);
+            }
+        }
+    }
+
     private static Map<String, Integer> getHeader(CSVRecord r) {
 
         Map<String, Integer> headerMap = new HashMap<String, Integer>();
@@ -268,6 +252,39 @@ public class AllPrint {
             i++;
         }
         return headerMap;
+    }
+
+    private static final class CSVRecordComparator implements Comparator<CSVRecord> {
+        private final SimpleDateFormat sdf = new SimpleDateFormat(YYYY_MM_DD);
+        private final Map<String, Integer> headerMap;
+
+        private CSVRecordComparator(Map<String, Integer> headerMap) {
+            this.headerMap = headerMap;
+        }
+
+        @Override
+        public int compare(CSVRecord r1, CSVRecord r2) {
+            try {
+                Date d1 = sdf.parse(r1.get(headerMap.get(baseDate)));
+                Date d2 = sdf.parse(r2.get(headerMap.get(baseDate)));
+                int comp1 = d1.compareTo(d2);
+                if (comp1 != 0) {
+                    return comp1;
+                }
+                String t1 = r1.get(headerMap.get("取引"));
+                String t2 = r2.get(headerMap.get("取引"));
+                if (t1.equals("ご売却") && t2.equals("ご売却")) {
+                    return 0;
+                } else if (t1.equals("ご売却")) {
+                    return 1;
+                } else if (t2.equals("ご売却")) {
+                    return -1;
+                }
+            } catch (ParseException e) {
+                e.printStackTrace();
+            }
+            return 0;
+        }
     }
 
     static class Money {
@@ -294,7 +311,6 @@ public class AllPrint {
 
         @Override
         public int hashCode() {
-
             final int prime = 31;
             int result = 1;
             result = prime * result + ((name == null) ? 0 : name.hashCode());
@@ -303,7 +319,6 @@ public class AllPrint {
 
         @Override
         public boolean equals(Object obj) {
-
             if (this == obj)
                 return true;
             if (obj == null)
@@ -321,12 +336,10 @@ public class AllPrint {
 
         @Override
         public String toString() {
-
             return "Stock [name=" + name + ", quantity=" + quantity + ", total=" + total + "]";
         }
 
         public Stock clone() {
-
             Stock stock = new Stock();
             stock.name = this.name;
             stock.quantity = this.quantity;
