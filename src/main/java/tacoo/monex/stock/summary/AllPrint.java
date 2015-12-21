@@ -3,6 +3,8 @@ package tacoo.monex.stock.summary;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.InputStreamReader;
+import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.text.DecimalFormat;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
@@ -18,14 +20,15 @@ import java.util.Map;
 import org.apache.commons.csv.CSVFormat;
 import org.apache.commons.csv.CSVParser;
 import org.apache.commons.csv.CSVRecord;
-import org.apache.commons.lang3.StringUtils;
 
 public class AllPrint {
 
     private static final String YYYY_MM_DD = "yyyy/MM/dd";
     static String baseDate = "受渡日";
 
-    // static String baseDate = "約定日";
+    // public static void main(String[] args) {
+    // AllPrint.printSummary(new File("19990101-20151218.csv"));
+    // }
 
     public static void printSummary(File csvFile) {
         try (CSVParser parser = CSVFormat.EXCEL.parse(new InputStreamReader(
@@ -103,9 +106,11 @@ public class AllPrint {
                         stock = new Stock();
                         stocks.put(stockCode, stock);
                     }
+                    int ave = ave(stock.total, stock.quantity, value, qty);
                     stock.name = stockCode + "-" + stockName;
                     stock.quantity += qty;
                     stock.total -= value;
+                    stock.averagePrice = ave;
                 } else if ("ご売却".equals(tradeType)) {
                     int value = df.parse(r.get(headerMap.get("受渡金額(円)"))).intValue();
                     int qty = df.parse(r.get(headerMap.get("数量（株/口）/返済数量"))).intValue();
@@ -128,18 +133,15 @@ public class AllPrint {
                         stocks.put(stockCode, stock);
                     }
                     stock.name = stockCode + "-" + stockName;
+
                     if (stock.quantity == qty) {
                         money.gain += (stock.total + value);
                         stocks.remove(stockCode);
                     } else {
-                        // int ave = -stock.total / stock.quantity;
-                        // int soldAve = value / qty;
-                        // System.out.println(String.format("%s\t%s=%d", date,
-                        // stockName, ((soldAve - ave) * qty)));
-                        // money.gain += ((soldAve - ave) * qty);
+                        int basePrice = stock.averagePrice * qty;
                         stock.quantity -= qty;
-                        // stock.total += value - ((soldAve - ave) * qty);
-                        stock.total += value;
+                        stock.total += basePrice;
+                        money.gain += value - basePrice;
                     }
                 } else {
                     System.out.println("unknown record found: " + r);
@@ -162,26 +164,28 @@ public class AllPrint {
                     return o1.compareTo(o2);
                 }
             });
-            System.out.println(String.format("%s%s%s%s%s%s"
-                    , StringUtils.leftPad("Year", 7)
-                    , StringUtils.leftPad("Credit", 13)
-                    , StringUtils.leftPad("Gain", 13)
-                    , StringUtils.leftPad("Yield", 13)
-                    , StringUtils.leftPad("SalesTax", 13)
-                    , StringUtils.leftPad("IncomeTax", 13)));
+            System.out.println(String.format("%7s%13s%13s%13s%13s%13s"
+                    , "Year"
+                    , "Credit"
+                    , "Gain"
+                    , "Yield"
+                    , "SalesTax"
+                    , "IncomeTax"));
             int totalCredit = 0;
             int totalGain = 0;
             int totalYeild = 0;
             int totalSalesTax = 0;
             int totalIncomeTax = 0;
             for (String k : keys) {
-                System.out.print(StringUtils.leftPad(k, 7));
                 Money money = sums.get(k);
-                System.out.print(StringUtils.leftPad("" + money.credit, 13));
-                System.out.print(StringUtils.leftPad("" + money.gain, 13));
-                System.out.print(StringUtils.leftPad("" + money.yield, 13));
-                System.out.print(StringUtils.leftPad("" + money.salesTax, 13));
-                System.out.println(StringUtils.leftPad("" + money.incomeTax, 13));
+                System.out.println(String.format("%7s%13d%13d%13d%13s%13d"
+                        , k
+                        , money.credit
+                        , money.gain
+                        , money.yield
+                        , "(" + money.salesTax + ")"
+                        , money.incomeTax));
+
                 totalCredit += money.credit;
                 totalGain += money.gain;
                 totalYeild += money.yield;
@@ -190,40 +194,48 @@ public class AllPrint {
             }
             System.out.println();
             System.out.println("Current Stocks");
-            System.out.println(String.format("%s%s\t%s"
-                    , StringUtils.leftPad("Quantity", 8)
-                    , StringUtils.leftPad("Amount", 13)
+            System.out.println(String.format("%8s%13s%10s"
+                    , "Quantity"
+                    , "Amount"
                     , "Name"));
 
             Money money = sums.get(keys[keys.length - 1]);
             int totalStock = 0;
             for (String id : money.stocks.keySet()) {
                 Stock stock = money.stocks.get(id);
-                System.out.println(StringUtils.leftPad("" + stock.quantity, 8)
-                        + StringUtils.leftPad("" + stock.total, 13)
-                        + "\t" + stock.name);
+                System.out.println(String.format("%8d%13d   %s", stock.quantity, stock.total, stock.name));
                 totalStock += stock.total;
             }
             System.out.println();
             System.out.println("Total");
-            System.out.println(String.format("%s%s%s%s%s"
-                    , StringUtils.leftPad("Credit", 13)
-                    , StringUtils.leftPad("Gain", 13)
-                    , StringUtils.leftPad("Yield", 13)
-                    , StringUtils.leftPad("SalesTax", 13)
-                    , StringUtils.leftPad("IncomeTax", 13)));
-            System.out.print(StringUtils.leftPad("" + totalCredit, 13));
-            System.out.print(StringUtils.leftPad("" + totalGain, 13));
-            System.out.print(StringUtils.leftPad("" + totalYeild, 13));
-            System.out.print(StringUtils.leftPad("" + totalSalesTax, 13));
-            System.out.println(StringUtils.leftPad("" + totalIncomeTax, 13));
+            System.out.println(String.format("%13s%13s%13s%13s%13s"
+                    , "Credit"
+                    , "Gain"
+                    , "Yield"
+                    , "SalesTax"
+                    , "IncomeTax"));
+            System.out.println(String.format("%13d%13d%13d%13s%13d"
+                    , totalCredit
+                    , totalGain
+                    , totalYeild
+                    , "(" + totalSalesTax + ")"
+                    , totalIncomeTax));
             System.out.println();
 
-            System.out.println(StringUtils.leftPad("Total Stock Amount:" + totalStock, 13));
+            double doubleValue = BigDecimal.valueOf(totalGain + totalYeild).divide(BigDecimal.valueOf(totalCredit), 4, RoundingMode.HALF_UP).multiply(BigDecimal.valueOf(100))
+                    .doubleValue();
+            System.out.println(String.format("%-20s%,.2f%%", "Performance:", doubleValue));
+            System.out.println(String.format("%-20s%13d", "Total Stock Amount:", totalStock));
         } catch (Exception e) {
             e.printStackTrace();
         }
 
+    }
+
+    private static int ave(int baseValue, int baseQty, int addedValue, int addedQty) {
+        int totalValue = Math.abs(baseValue) + Math.abs(addedValue);
+        int totalQty = Math.abs(baseQty) + Math.abs(addedQty);
+        return BigDecimal.valueOf(totalValue).divide(BigDecimal.valueOf(totalQty), 0, RoundingMode.UP).intValue();
     }
 
     private static void filterHeaderAndMRF(CSVParser parser, final Map<String, Integer> headerMap, List<CSVRecord> csvDataList) {
@@ -300,7 +312,6 @@ public class AllPrint {
         public String toString() {
             return "Money [credit=" + credit + ", yield=" + yield + ", incomeTax=" + incomeTax + ", salesTax=" + salesTax + ", gain=" + gain + ", stocks=" + stocks + "]";
         }
-
     }
 
     static class Stock {
@@ -308,6 +319,7 @@ public class AllPrint {
         String name;
         int quantity;
         int total;
+        int averagePrice;
 
         @Override
         public int hashCode() {
@@ -336,7 +348,7 @@ public class AllPrint {
 
         @Override
         public String toString() {
-            return "Stock [name=" + name + ", quantity=" + quantity + ", total=" + total + "]";
+            return "Stock [name=" + name + ", quantity=" + quantity + ", total=" + total + ", averagePrice=" + averagePrice + "]";
         }
 
         public Stock clone() {
@@ -344,9 +356,8 @@ public class AllPrint {
             stock.name = this.name;
             stock.quantity = this.quantity;
             stock.total = this.total;
+            stock.averagePrice = this.averagePrice;
             return stock;
         }
-
     }
-
 }
