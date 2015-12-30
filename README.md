@@ -1,6 +1,5 @@
 # monex-stock-summary
 Login to Monex and download yearly stock trading activities(csv) and summarize by monthly.
-But currently this is not working because the calculater does not use average acquisition cost so the total income of the year will not be accurate.
 
 ## Requirements
 + Xvfb
@@ -16,3 +15,14 @@ Modify '/monex-stock-summary/src/main/resources/monex.properties'
 
 ## Run
 ``xvfb-run java -jar build/libs/monex-stock-summary-1.0-capsule.jar``
+
+## Columns
+
+- Credit that you deposit in that year.
+- Gain that you earned in that year. Taxable.
+- Gain(NoTax) that you earned in that year but non taxable.
+- Yield that you received in that year.
+- SalesTax/Fee that you already paid to buy stocks in that year.
+- IncomTax that you paid to Japanese government in that year.
+- Earned that you actually earned in that year including tax.
+
