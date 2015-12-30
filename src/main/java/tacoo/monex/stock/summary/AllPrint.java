@@ -26,9 +26,9 @@ public class AllPrint {
     private static final String YYYY_MM_DD = "yyyy/MM/dd";
     static String baseDate = "受渡日";
 
-    // public static void main(String[] args) {
-    // AllPrint.printSummary(new File("19990101-20151218.csv"));
-    // }
+    public static void main(String[] args) {
+        AllPrint.printSummary(new File("19990101-20151229.csv"));
+    }
 
     public static void printSummary(File csvFile) {
         try (CSVParser parser = CSVFormat.EXCEL.parse(new InputStreamReader(
@@ -83,6 +83,7 @@ public class AllPrint {
                     int tax = df.parse(r.get(headerMap.get("受渡金額(円)"))).intValue();
                     money.incomeTax += tax;
                 } else if ("ＭＲＦ再投資".equals(tradeType)
+                        || "ＭＲＦ再投資（一般）".equals(tradeType)
                         || "配当金".equals(tradeType)) {
                     money.yield += df.parse(r.get(headerMap.get("受渡金額(円)"))).intValue();
                 } else if ("お買付".equals(tradeType)) {
@@ -92,11 +93,8 @@ public class AllPrint {
                     int salesTax1 = df.parse(r.get(headerMap.get("手数料"))).intValue();
                     int salesTax2 = df.parse(r.get(headerMap.get("税金(手数料消費税及び譲渡益税)"))).intValue();
 
-                    value += salesTax1;
-                    value += salesTax2;
-
-                    money.salesTax += salesTax1;
-                    money.salesTax += salesTax2;
+                    money.salesTaxFee += salesTax1;
+                    money.salesTaxFee += salesTax2;
 
                     String stockCode = r.get(headerMap.get("銘柄コード")).trim();
                     String stockName = r.get(headerMap.get("銘柄名")).trim();
@@ -118,11 +116,8 @@ public class AllPrint {
                     int salesTax1 = df.parse(r.get(headerMap.get("手数料"))).intValue();
                     int salesTax2 = df.parse(r.get(headerMap.get("税金(手数料消費税及び譲渡益税)"))).intValue();
 
-                    value -= salesTax1;
-                    value -= salesTax2;
-
-                    money.salesTax += salesTax1;
-                    money.salesTax += salesTax2;
+                    money.salesTaxFee += salesTax1;
+                    money.salesTaxFee += salesTax2;
 
                     String stockCode = r.get(headerMap.get("銘柄コード")).trim();
                     String stockName = r.get(headerMap.get("銘柄名")).trim();
@@ -134,14 +129,14 @@ public class AllPrint {
                     }
                     stock.name = stockCode + "-" + stockName;
 
-                    if (stock.quantity == qty) {
-                        money.gain += (stock.total + value);
+                    int basePrice = stock.averagePrice * qty;
+                    stock.quantity -= qty;
+                    stock.total += basePrice;
+                    money.taxableGain += value - basePrice;
+
+                    if (stock.quantity == 0) {
+                        money.nonTaxableGain += stock.total;
                         stocks.remove(stockCode);
-                    } else {
-                        int basePrice = stock.averagePrice * qty;
-                        stock.quantity -= qty;
-                        stock.total += basePrice;
-                        money.gain += value - basePrice;
                     }
                 } else {
                     System.out.println("unknown record found: " + r);
@@ -164,32 +159,38 @@ public class AllPrint {
                     return o1.compareTo(o2);
                 }
             });
-            System.out.println(String.format("%7s%13s%13s%13s%13s%13s"
+            System.out.println(String.format("%7s%13s%13s%13s%13s%13s%13s%13s"
                     , "Year"
                     , "Credit"
                     , "Gain"
+                    , "Gain(NoTax)"
                     , "Yield"
-                    , "SalesTax"
-                    , "IncomeTax"));
+                    , "SalesTax/Fee"
+                    , "IncomeTax"
+                    , "Earned"));
             int totalCredit = 0;
             int totalGain = 0;
+            int totalNoTaxGain = 0;
             int totalYeild = 0;
             int totalSalesTax = 0;
             int totalIncomeTax = 0;
             for (String k : keys) {
                 Money money = sums.get(k);
-                System.out.println(String.format("%7s%13d%13d%13d%13s%13d"
+                System.out.println(String.format("%7s%13d%13d%13d%13d%13s%13d%13d"
                         , k
                         , money.credit
-                        , money.gain
+                        , money.taxableGain
+                        , money.nonTaxableGain
                         , money.yield
-                        , "(" + money.salesTax + ")"
-                        , money.incomeTax));
+                        , "(" + money.salesTaxFee + ")"
+                        , money.incomeTax
+                        , money.taxableGain + money.nonTaxableGain + money.yield - money.incomeTax));
 
                 totalCredit += money.credit;
-                totalGain += money.gain;
+                totalGain += money.taxableGain;
+                totalNoTaxGain += money.nonTaxableGain;
                 totalYeild += money.yield;
-                totalSalesTax += money.salesTax;
+                totalSalesTax += money.salesTaxFee;
                 totalIncomeTax += money.incomeTax;
             }
             System.out.println();
@@ -208,21 +209,25 @@ public class AllPrint {
             }
             System.out.println();
             System.out.println("Total");
-            System.out.println(String.format("%13s%13s%13s%13s%13s"
+            System.out.println(String.format("%13s%13s%13s%13s%13s%13s"
                     , "Credit"
                     , "Gain"
+                    , "Gain(NoTax)"
                     , "Yield"
-                    , "SalesTax"
+                    , "SalesTax/Fee"
                     , "IncomeTax"));
-            System.out.println(String.format("%13d%13d%13d%13s%13d"
+            System.out.println(String.format("%13d%13d%13d%13d%13s%13d"
                     , totalCredit
                     , totalGain
+                    , totalNoTaxGain
                     , totalYeild
                     , "(" + totalSalesTax + ")"
                     , totalIncomeTax));
             System.out.println();
 
-            double doubleValue = BigDecimal.valueOf(totalGain + totalYeild).divide(BigDecimal.valueOf(totalCredit), 4, RoundingMode.HALF_UP).multiply(BigDecimal.valueOf(100))
+            double doubleValue = BigDecimal.valueOf(totalGain + totalNoTaxGain + totalYeild - totalIncomeTax)
+                    .divide(BigDecimal.valueOf(totalCredit), 4, RoundingMode.HALF_UP)
+                    .multiply(BigDecimal.valueOf(100))
                     .doubleValue();
             System.out.println(String.format("%-20s%,.2f%%", "Performance:", doubleValue));
             System.out.println(String.format("%-20s%13d", "Total Stock Amount:", totalStock));
@@ -304,13 +309,15 @@ public class AllPrint {
         int credit = 0;
         int yield = 0;
         int incomeTax = 0;
-        int salesTax = 0;
-        int gain = 0;
+        int salesTaxFee = 0;
+        int taxableGain = 0;
+        int nonTaxableGain = 0;
         Map<String, Stock> stocks = new HashMap<String, Stock>();
 
         @Override
         public String toString() {
-            return "Money [credit=" + credit + ", yield=" + yield + ", incomeTax=" + incomeTax + ", salesTax=" + salesTax + ", gain=" + gain + ", stocks=" + stocks + "]";
+            return "Money [credit=" + credit + ", yield=" + yield + ", incomeTax=" + incomeTax + ", salesTaxFee=" + salesTaxFee + ", taxableGain=" + taxableGain
+                    + ", nonTaxableGain=" + nonTaxableGain + ", stocks=" + stocks + "]";
         }
     }
 
