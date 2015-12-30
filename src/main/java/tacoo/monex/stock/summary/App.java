@@ -46,7 +46,7 @@ public class App {
         FirefoxProfile profile = setupProfile();
         FirefoxDriver driver = new FirefoxDriver(profile);
         driver.get("http://www.monex.co.jp/");
-        WebElement loginElement = driver.findElement(By.xpath("//a[contains(@href, 'login')]"));
+        WebElement loginElement = driver.findElement(By.xpath("//a[contains(@href, 'login')]/img"));
         loginElement.click();
         wait(driver, "//input[@name='loginid']");
         WebElement idElement = driver.findElement(By.xpath("//input[@name='loginid']"));
@@ -81,11 +81,18 @@ public class App {
         Select fromDaySelect = new Select(fromDayElement);
         fromDaySelect.selectByValue("1");
 
+        WebElement toMonthElement = driver.findElement(By.name("TO_MONTH"));
+        Select toMonthSelect = new Select(toMonthElement);
+        toMonthSelect.selectByValue("12");
+        WebElement toDayElement = driver.findElement(By.name("TO_DAY"));
+        Select toDaySelect = new Select(toDayElement);
+        toDaySelect.selectByValue("31");
+        
         WebElement downloadElement = driver.findElement(By.name("SUBMIT"));
         downloadElement.click();
 
         File csvFile = null;
-        for (int i = 0; i < 30; i++) {
+        for (int i = 0; i < 60; i++) {
             Optional<File> first = Stream.of(new File(tempDirPath).listFiles())
                     .filter(f -> f.getName().endsWith(".csv"))
                     .findFirst();
