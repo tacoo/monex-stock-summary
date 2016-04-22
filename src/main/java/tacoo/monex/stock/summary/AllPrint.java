@@ -70,9 +70,11 @@ public class AllPrint {
                 String tradeType = r.get(headerMap.get("取引"));
 
                 if ("ご入金".equals(tradeType)
-                        || "口座振替（外国株口座から）".equals(tradeType)) {
+                        || "口座振替（外国株口座から）".equals(tradeType) 
+                        || "口座振替（ＦＸＰＬＵＳ口座から）".equals(tradeType)) {
                     money.credit += df.parse(r.get(headerMap.get("受渡金額(円)"))).intValue();
-                } else if ("口座振替（外国株口座へ）".equals(tradeType)) {
+                } else if ("口座振替（外国株口座へ）".equals(tradeType)
+                        || "口座振替（ＦＸＰＬＵＳ口座へ）".equals(tradeType)) {
                     money.credit -= df.parse(r.get(headerMap.get("受渡金額(円)"))).intValue();
                 } else if ("源泉徴収税（所得税）".equals(tradeType)
                         || "源泉徴収税（住民税）".equals(tradeType)) {
@@ -84,6 +86,7 @@ public class AllPrint {
                     money.incomeTax += tax;
                 } else if ("ＭＲＦ再投資".equals(tradeType)
                         || "ＭＲＦ再投資（一般）".equals(tradeType)
+                        || "ＭＲＦ再投資（特定）".equals(tradeType)
                         || "配当金".equals(tradeType)) {
                     money.yield += df.parse(r.get(headerMap.get("受渡金額(円)"))).intValue();
                 } else if ("お買付".equals(tradeType)) {
