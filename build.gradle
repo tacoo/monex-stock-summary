@@ -1,19 +1,10 @@
-plugins {
-  id "us.kirchmeier.capsule" version "1.0-rc1"
-}
-
 apply plugin: 'java'
 apply plugin: 'eclipse'
 
 sourceCompatibility = 1.8
 version = '1.0'
 
-jar {
-    manifest {
-        attributes 'Implementation-Title': 'Gradle Quickstart',
-                   'Implementation-Version': version
-    }
-}
+ext.mainClassName = 'tacoo.monex.stock.summary.App'
 
 repositories {
     mavenCentral()
@@ -25,7 +16,12 @@ dependencies {
     compile 'org.apache.commons:commons-csv:1.1'
 }
 
-task fatCapsule(type: FatCapsule) {
-  applicationClass 'tacoo.monex.stock.summary.App'
-}
+jar {
+  manifest { 
+    attributes "Main-Class": mainClassName
+  }  
 
+  from {
+    configurations.compile.collect { it.isDirectory() ? it : zipTree(it) }
+  }
+}
