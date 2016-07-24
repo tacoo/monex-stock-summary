@@ -11,10 +11,10 @@ Login to Monex and download yearly stock trading activities(csv) and summarize b
 Modify '/monex-stock-summary/src/main/resources/monex.properties'
 
 ## Build
-``gradle clean fatCapsule``
+``gradle clean jar``
 
 ## Run
-``xvfb-run java -jar build/libs/monex-stock-summary-1.0-capsule.jar``
+``xvfb-run java -jar build/libs/monex-stock-summary-1.0.jar``
 
 ## Columns
 
