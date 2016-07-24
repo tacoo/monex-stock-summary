@@ -15,8 +15,9 @@ import org.openqa.selenium.Keys;
 import org.openqa.selenium.WebElement;
 import org.openqa.selenium.firefox.FirefoxDriver;
 import org.openqa.selenium.firefox.FirefoxProfile;
+import org.openqa.selenium.firefox.MarionetteDriver;
+import org.openqa.selenium.remote.DesiredCapabilities;
 import org.openqa.selenium.support.ui.ExpectedConditions;
-import org.openqa.selenium.support.ui.Select;
 import org.openqa.selenium.support.ui.WebDriverWait;
 
 public class App {
@@ -44,7 +45,9 @@ public class App {
 
     private File fetchCurrentYearSummary(String id, String pass) {
         FirefoxProfile profile = setupProfile();
-        FirefoxDriver driver = new FirefoxDriver(profile);
+        DesiredCapabilities dc = DesiredCapabilities.firefox();
+        dc.setCapability(FirefoxDriver.PROFILE, profile);
+        MarionetteDriver driver = new MarionetteDriver(dc);
         driver.get("http://www.monex.co.jp/");
         WebElement loginElement = driver.findElement(By.xpath("//a[contains(@href, 'login')]/img"));
         loginElement.click();
@@ -70,29 +73,20 @@ public class App {
         wait(driver, "//input[@name='TRADE_DATE_TYPE']");
         driver.findElement(By.xpath("//input[@name='TRADE_DATE_TYPE' and @value='1']")).click();
 
-        WebElement fromYearElement = driver.findElement(By.name("FROM_YEAR"));
-        Select fromYearSelect = new Select(fromYearElement);
-        fromYearSelect.selectByValue("1999");
+        driver.executeScript("document.TRADE_HST.FROM_YEAR.selectedIndex = 0");
+        driver.executeScript("document.TRADE_HST.FROM_MONTH.selectedIndex = 0");
+        driver.executeScript("document.TRADE_HST.FROM_DAY.selectedIndex = 0");
 
-        WebElement fromMonthElement = driver.findElement(By.name("FROM_MONTH"));
-        Select fromMonthSelect = new Select(fromMonthElement);
-        fromMonthSelect.selectByValue("1");
-        WebElement fromDayElement = driver.findElement(By.name("FROM_DAY"));
-        Select fromDaySelect = new Select(fromDayElement);
-        fromDaySelect.selectByValue("1");
+        driver.executeScript("document.TRADE_HST.TO_MONTH.selectedIndex = 11");
+        driver.executeScript("document.TRADE_HST.TO_DAY.selectedIndex = 30");
 
-        WebElement toMonthElement = driver.findElement(By.name("TO_MONTH"));
-        Select toMonthSelect = new Select(toMonthElement);
-        toMonthSelect.selectByValue("12");
-        WebElement toDayElement = driver.findElement(By.name("TO_DAY"));
-        Select toDaySelect = new Select(toDayElement);
-        toDaySelect.selectByValue("31");
-        
+        driver.findElement(By.xpath("//input[@value='全て選択' and @type='BUTTON']")).click();
+
         WebElement downloadElement = driver.findElement(By.name("SUBMIT"));
         downloadElement.click();
 
         File csvFile = null;
-        for (int i = 0; i < 60; i++) {
+        for (int i = 0; i < 120; i++) {
             Optional<File> first = Stream.of(new File(tempDirPath).listFiles())
                     .filter(f -> f.getName().endsWith(".csv"))
                     .findFirst();
@@ -110,9 +104,7 @@ public class App {
 
         System.out.println("csv file: " + csvFile.getAbsolutePath());
 
-        driver.close();
-        driver.switchTo().window(mainWinID);
-        driver.close();
+        driver.quit();
 
         return csvFile;
     }
@@ -134,7 +126,7 @@ public class App {
         return firefoxProfile;
     }
 
-    private void wait(FirefoxDriver driver, String xpath) {
+    private void wait(MarionetteDriver driver, String xpath) {
         WebDriverWait wait = new WebDriverWait(driver, 30);
         wait.until(ExpectedConditions.visibilityOfElementLocated(By.xpath(xpath)));
     }

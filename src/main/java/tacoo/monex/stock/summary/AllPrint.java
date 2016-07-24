@@ -14,8 +14,10 @@ import java.util.Calendar;
 import java.util.Comparator;
 import java.util.Date;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import org.apache.commons.csv.CSVFormat;
 import org.apache.commons.csv.CSVParser;
@@ -29,6 +31,12 @@ public class AllPrint {
     public static void main(String[] args) {
         AllPrint.printSummary(new File("19990101-20151229.csv"));
     }
+
+    static Set<String> creditIn = set("ご入金", "口座振替（外国株口座から）", "口座振替（ＦＸＰＬＵＳ口座から）", "振替（信用保証金から）");
+    static Set<String> creditOut = set("口座振替（外国株口座へ）", "口座振替（ＦＸＰＬＵＳ口座へ）", "振替（信用保証金へ）");
+    static Set<String> tax = set("源泉徴収税（所得税）", "源泉徴収税（住民税）");
+    static Set<String> taxReturn = set("還付金（所得税）", "還付金（住民税）");
+    static Set<String> yield = set("ＭＲＦ再投資", "ＭＲＦ再投資（一般）", "ＭＲＦ再投資（特定）", "配当金");
 
     public static void printSummary(File csvFile) {
         try (CSVParser parser = CSVFormat.EXCEL.parse(new InputStreamReader(
@@ -69,22 +77,17 @@ public class AllPrint {
                 }
                 String tradeType = r.get(headerMap.get("取引"));
 
-                if ("ご入金".equals(tradeType)
-                        || "口座振替（外国株口座から）".equals(tradeType)) {
+                if (creditIn.contains(tradeType)) {
                     money.credit += df.parse(r.get(headerMap.get("受渡金額(円)"))).intValue();
-                } else if ("口座振替（外国株口座へ）".equals(tradeType)) {
+                } else if (creditOut.contains(tradeType)) {
                     money.credit -= df.parse(r.get(headerMap.get("受渡金額(円)"))).intValue();
-                } else if ("源泉徴収税（所得税）".equals(tradeType)
-                        || "源泉徴収税（住民税）".equals(tradeType)) {
+                } else if (tax.contains(tradeType)) {
                     int tax = -df.parse(r.get(headerMap.get("受渡金額(円)"))).intValue();
                     money.incomeTax += tax;
-                } else if ("還付金（所得税）".equals(tradeType)
-                        || "還付金（住民税）".equals(tradeType)) {
+                } else if (taxReturn.contains(tradeType)) {
                     int tax = df.parse(r.get(headerMap.get("受渡金額(円)"))).intValue();
                     money.incomeTax += tax;
-                } else if ("ＭＲＦ再投資".equals(tradeType)
-                        || "ＭＲＦ再投資（一般）".equals(tradeType)
-                        || "配当金".equals(tradeType)) {
+                } else if (yield.contains(tradeType)) {
                     money.yield += df.parse(r.get(headerMap.get("受渡金額(円)"))).intValue();
                 } else if ("お買付".equals(tradeType)) {
                     int value = df.parse(r.get(headerMap.get("受渡金額(円)"))).intValue();
@@ -235,6 +238,14 @@ public class AllPrint {
             e.printStackTrace();
         }
 
+    }
+
+    private static Set<String> set(String... ss) {
+        HashSet<String> set = new HashSet<String>();
+        for (String s : ss) {
+            set.add(s);
+        }
+        return set;
     }
 
     private static int ave(int baseValue, int baseQty, int addedValue, int addedQty) {
